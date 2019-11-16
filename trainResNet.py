@@ -133,6 +133,41 @@ aug = ImageDataGenerator(width_shift_range=0.1,
 plotPath = os.path.sep.join(["output", "resnet_fashion_mnist.png"])
 jsonPath = os.path.sep.join(["output", "resnet_fashion_mnist.json"])
 
+
+def lr_schedule(epoch):
+    """Learning Rate Schedule
+
+    Learning rate is scheduled to be reduced after 80, 120, 160, 180 epochs.
+    Called automatically every epoch as part of callbacks during training.
+
+    # Arguments
+        epoch (int): The number of epochs
+
+    # Returns
+        lr (float32): learning rate
+
+    ## Note : Turn off this call back if loading a saved model since it would start
+    from epoch 0 always
+    """
+    #lr = 1e-3
+    lr = 0.1
+    if epoch > 180:
+        lr *= 1e-4
+    elif epoch > 160:
+        lr *= 5e-4
+    elif epoch > 120:
+        lr *= 1e-3
+    elif epoch > 80:
+        lr *= 5e-3
+    elif epoch > 50:
+        lr *= 1e-2
+    elif epoch > 40:
+        lr *= 5e-2
+    elif epoch > 30:
+        lr *= 1e-1
+    print('Learning rate: ', lr)
+    return lr
+
 # construct the set of callbacks
 callbacks = [
 	EpochCheckpoint(args["checkpoints"], every=5,
@@ -141,13 +176,15 @@ callbacks = [
 		jsonPath=jsonPath,
 		startAt=args["start_epoch"]),
 	ReduceLROnPlateau(monitor = "val_loss",
-                     factor=0.1,
-                     cooldown=0,
-                     patience=2,
+                     factor=np.sqrt(0.1),
+                     cooldown=2,
+                     patience=5,
                      epsilon = 1e-04,
                      min_lr=0.5e-6,
-                     verbose = 1) ]
+                     verbose = 1),
+        LearningRateScheduler(lr_schedule)]
 
+print ('#################',callbacks)
 ###########################################################################		]
 # Construct Resnet Models
 ###########################################################################
@@ -380,7 +417,7 @@ if args["model"] is None:
     else:
         model = resnet_v1(input_shape=input_shape, depth=depth)
         
-    opt = SGD(lr=1e-1)
+    opt = SGD(lr=lr_schedule(0))
     model.compile(loss="categorical_crossentropy", optimizer=opt,
             metrics=["accuracy"])
     model.summary()
@@ -414,6 +451,6 @@ model.fit_generator(
 	verbose=1)
 
 # Score trained model.
-scores = model.evaluate(x_test, y_test, verbose=1)
+scores = model.evaluate(testX, testY, verbose=1)
 print('Test loss:', scores[0])
 print('Test accuracy:', scores[1])
